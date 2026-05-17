@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 const BITCASK_DATA_DIR: &'static str = "data";
@@ -61,10 +61,9 @@ impl DataFile {
     fn write_entry(&mut self, key: &KeyType, val: &ValueType) -> Result<ValueLocation> {
         let buf = serialize_datafile_entry(key, val);
         self.file.write_all(&buf)?;
-        let inner_offset = 2 * size_of::<u32>() + key.len();
         Ok(ValueLocation {
             value_size: val.len(),
-            value_pos: self.file.metadata()?.len() + inner_offset as u64,
+            value_pos: self.file.metadata()?.len() - val.len() as u64,
         })
     }
 }
@@ -84,13 +83,22 @@ impl BitCask {
 
         Ok(Self { data_file, key_dir })
     }
-    pub fn get(&self, key: &KeyType) -> Result<ValueType> {
-        unimplemented!();
+    pub fn get(&mut self, key: &KeyType) -> Result<ValueType> {
+        match self.key_dir.get(key) {
+            Some(location) => {
+                let mut value = vec![0; location.value_size];
+                self.data_file
+                    .file
+                    .seek(SeekFrom::Start(location.value_pos))?;
+                self.data_file.file.read_exact(&mut value)?;
+                Ok(value)
+            }
+            None => Err(BitCaskError::BitCaskError),
+        }
     }
     pub fn put(&mut self, key: KeyType, val: ValueType) -> Result<()> {
         let value_location = self.data_file.write_entry(&key, &val)?;
         self.key_dir.insert(key, value_location);
-        println!("{:?}", self.key_dir);
         Ok(())
     }
     pub fn delete(&self, key: &KeyType) -> Result<()> {
@@ -106,5 +114,10 @@ fn main() {
     db.put(k.clone(), v.clone()).unwrap();
 
     let result = db.get(&k).unwrap();
+    let key_as_str = String::from_utf8(k.clone()).unwrap();
+    let result_as_str = String::from_utf8(result.clone()).unwrap();
+    println!("Read {}: {}", &key_as_str, &result_as_str);
     assert_eq!(v, result);
+
+    println!("Done!");
 }
