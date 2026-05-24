@@ -97,12 +97,22 @@ impl BitCask {
         }
     }
     pub fn put(&mut self, key: KeyType, val: ValueType) -> Result<()> {
+        if val.is_empty() {
+            return Err(BitCaskError::BitCaskError);
+        }
         let value_location = self.data_file.write_entry(&key, &val)?;
         self.key_dir.insert(key, value_location);
         Ok(())
     }
-    pub fn delete(&self, key: &KeyType) -> Result<()> {
-        unimplemented!()
+    pub fn delete(&mut self, key: &KeyType) -> Result<()> {
+        if !self.key_dir.contains_key(key) {
+            return Err(BitCaskError::BitCaskError);
+        }
+        // use an empty value as tombstone.
+        let val = Vec::new();
+        self.data_file.write_entry(key, &val)?;
+        self.key_dir.remove(key);
+        Ok(())
     }
 }
 
@@ -118,6 +128,9 @@ fn main() {
     let result_as_str = String::from_utf8(result.clone()).unwrap();
     println!("Read {}: {}", &key_as_str, &result_as_str);
     assert_eq!(v, result);
+
+    db.delete(&k).unwrap();
+    db.get(&k).expect_err("The key should not exist.");
 
     println!("Done!");
 }
