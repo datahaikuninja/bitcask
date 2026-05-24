@@ -133,3 +133,23 @@ fn main() {
 
     println!("Done!");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    #[test]
+    fn simple_put_get() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let mut test_db = BitCask::new(tmp_dir)?;
+
+        let k = KeyType::from("foo".as_bytes());
+        let v = ValueType::from("bar".as_bytes());
+        test_db.put(k.clone(), v.clone())?;
+
+        let result = test_db.get(&k)?;
+        assert_eq!(v, result);
+        Ok(())
+    }
+}
