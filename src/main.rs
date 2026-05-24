@@ -3,7 +3,6 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
-const BITCASK_DATA_DIR: &'static str = "data";
 const BITCASK_DATA_FILE_NAME: &'static str = "bitcask.data";
 
 type KeyType = Vec<u8>;
@@ -48,9 +47,8 @@ struct DataFile {
 }
 
 impl DataFile {
-    pub fn new(data_file_path: &str) -> Result<Self> {
-        std::fs::create_dir_all(BITCASK_DATA_DIR)?;
-        let path = Path::new(BITCASK_DATA_DIR).join(data_file_path);
+    pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
+        let path = data_dir.as_ref().join(BITCASK_DATA_FILE_NAME);
         let file = std::fs::OpenOptions::new()
             .read(true)
             .create(true)
@@ -74,9 +72,9 @@ struct BitCask {
 }
 
 impl BitCask {
-    pub fn new() -> Result<Self> {
-        println!("start BitCask");
-        let data_file = DataFile::new(BITCASK_DATA_FILE_NAME)?;
+    pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
+        std::fs::create_dir_all(data_dir.as_ref())?;
+        let data_file = DataFile::new(data_dir.as_ref())?;
         let key_dir = KeyDir::new();
 
         // TODO: build the KeyDir when the BitCask start.
@@ -117,7 +115,8 @@ impl BitCask {
 }
 
 fn main() {
-    let mut db = BitCask::new().unwrap();
+    let data_dir: &'static str = "data";
+    let mut db = BitCask::new(data_dir).unwrap();
 
     let k = Vec::from("foo".as_bytes());
     let v = Vec::from("bar".as_bytes());
