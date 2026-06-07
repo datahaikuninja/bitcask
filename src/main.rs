@@ -162,4 +162,18 @@ mod tests {
         test_db.get(&k).expect_err("Key should not exist.");
         Ok(())
     }
+
+    #[test]
+    fn delete_key() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let mut test_db = BitCask::new(tmp_dir)?;
+
+        let k = KeyType::from("foo".as_bytes());
+        let v = ValueType::from("bar".as_bytes());
+        test_db.put(k.clone(), v.clone())?;
+        test_db.delete(&k)?;
+
+        test_db.get(&k).expect_err("Key should not exist.");
+        Ok(())
+    }
 }
