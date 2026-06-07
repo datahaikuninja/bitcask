@@ -189,4 +189,18 @@ mod tests {
         assert_eq!(err, BitCaskError::KeyNotFoundError);
         Ok(())
     }
+
+    #[test]
+    fn reject_put_empty_key() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let mut test_db = BitCask::new(tmp_dir)?;
+
+        let k = KeyType::from("".as_bytes());
+        let v = ValueType::from("bar".as_bytes());
+        let err = test_db
+            .put(k.clone(), v.clone())
+            .expect_err("Empty key should be rejected.");
+        assert_eq!(err, BitCaskError::KeyEmptyError);
+        Ok(())
+    }
 }
