@@ -152,4 +152,14 @@ mod tests {
         assert_eq!(v, result);
         Ok(())
     }
+
+    #[test]
+    fn get_non_exist_key() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let mut test_db = BitCask::new(tmp_dir)?;
+
+        let k = KeyType::from("foo".as_bytes());
+        test_db.get(&k).expect_err("Key should not exist.");
+        Ok(())
+    }
 }
