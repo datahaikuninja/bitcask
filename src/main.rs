@@ -82,6 +82,10 @@ impl BitCask {
         Ok(Self { data_file, key_dir })
     }
     pub fn get(&mut self, key: &KeyType) -> Result<ValueType> {
+        if key.is_empty() {
+            // TODO: return an error like BitCaskError::EmptyKey
+            return Err(BitCaskError::BitCaskError);
+        }
         match self.key_dir.get(key) {
             Some(location) => {
                 let mut value = vec![0; location.value_size];
@@ -95,7 +99,12 @@ impl BitCask {
         }
     }
     pub fn put(&mut self, key: KeyType, val: ValueType) -> Result<()> {
+        if key.is_empty() {
+            // TODO: return an error like BitCaskError::EmptyKey
+            return Err(BitCaskError::BitCaskError);
+        }
         if val.is_empty() {
+            // TODO: return BitCaskError::EmptyVal
             return Err(BitCaskError::BitCaskError);
         }
         let value_location = self.data_file.write_entry(&key, &val)?;
@@ -103,6 +112,10 @@ impl BitCask {
         Ok(())
     }
     pub fn delete(&mut self, key: &KeyType) -> Result<()> {
+        if key.is_empty() {
+            // TODO: return an error like BitCaskError::EmptyKey
+            return Err(BitCaskError::BitCaskError);
+        }
         if !self.key_dir.contains_key(key) {
             return Err(BitCaskError::BitCaskError);
         }
