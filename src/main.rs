@@ -8,9 +8,11 @@ const BITCASK_DATA_FILE_NAME: &'static str = "bitcask.data";
 type KeyType = Vec<u8>;
 type ValueType = Vec<u8>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum BitCaskError {
-    BitCaskError,
+    KeyEmptyError,
+    KeyNotFoundError,
+    ValueEmptyError,
     IO(String),
 }
 
@@ -83,8 +85,7 @@ impl BitCask {
     }
     pub fn get(&mut self, key: &KeyType) -> Result<ValueType> {
         if key.is_empty() {
-            // TODO: return an error like BitCaskError::EmptyKey
-            return Err(BitCaskError::BitCaskError);
+            return Err(BitCaskError::KeyEmptyError);
         }
         match self.key_dir.get(key) {
             Some(location) => {
@@ -95,17 +96,15 @@ impl BitCask {
                 self.data_file.file.read_exact(&mut value)?;
                 Ok(value)
             }
-            None => Err(BitCaskError::BitCaskError),
+            None => Err(BitCaskError::KeyNotFoundError),
         }
     }
     pub fn put(&mut self, key: KeyType, val: ValueType) -> Result<()> {
         if key.is_empty() {
-            // TODO: return an error like BitCaskError::EmptyKey
-            return Err(BitCaskError::BitCaskError);
+            return Err(BitCaskError::KeyEmptyError);
         }
         if val.is_empty() {
-            // TODO: return BitCaskError::EmptyVal
-            return Err(BitCaskError::BitCaskError);
+            return Err(BitCaskError::ValueEmptyError);
         }
         let value_location = self.data_file.write_entry(&key, &val)?;
         self.key_dir.insert(key, value_location);
@@ -113,11 +112,10 @@ impl BitCask {
     }
     pub fn delete(&mut self, key: &KeyType) -> Result<()> {
         if key.is_empty() {
-            // TODO: return an error like BitCaskError::EmptyKey
-            return Err(BitCaskError::BitCaskError);
+            return Err(BitCaskError::KeyEmptyError);
         }
         if !self.key_dir.contains_key(key) {
-            return Err(BitCaskError::BitCaskError);
+            return Err(BitCaskError::KeyNotFoundError);
         }
         // use an empty value as tombstone.
         let val = Vec::new();
@@ -172,7 +170,8 @@ mod tests {
         let mut test_db = BitCask::new(tmp_dir)?;
 
         let k = KeyType::from("foo".as_bytes());
-        test_db.get(&k).expect_err("Key should not exist.");
+        let err = test_db.get(&k).expect_err("Key should not exist.");
+        assert_eq!(err, BitCaskError::KeyNotFoundError);
         Ok(())
     }
 
@@ -186,7 +185,8 @@ mod tests {
         test_db.put(k.clone(), v.clone())?;
         test_db.delete(&k)?;
 
-        test_db.get(&k).expect_err("Key should not exist.");
+        let err = test_db.get(&k).expect_err("Key should not exist.");
+        assert_eq!(err, BitCaskError::KeyNotFoundError);
         Ok(())
     }
 }
