@@ -8,7 +8,7 @@ const BITCASK_DATA_FILE_NAME: &'static str = "bitcask.data";
 type KeyType = Vec<u8>;
 type ValueType = Vec<u8>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum BitCaskError {
     KeyEmptyError,
     KeyNotFoundError,
@@ -170,7 +170,8 @@ mod tests {
         let mut test_db = BitCask::new(tmp_dir)?;
 
         let k = KeyType::from("foo".as_bytes());
-        test_db.get(&k).expect_err("Key should not exist.");
+        let err = test_db.get(&k).expect_err("Key should not exist.");
+        assert_eq!(err, BitCaskError::KeyNotFoundError);
         Ok(())
     }
 
@@ -184,7 +185,8 @@ mod tests {
         test_db.put(k.clone(), v.clone())?;
         test_db.delete(&k)?;
 
-        test_db.get(&k).expect_err("Key should not exist.");
+        let err = test_db.get(&k).expect_err("Key should not exist.");
+        assert_eq!(err, BitCaskError::KeyNotFoundError);
         Ok(())
     }
 }
