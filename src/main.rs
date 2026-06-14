@@ -191,6 +191,17 @@ mod tests {
     }
 
     #[test]
+    fn reject_get_empty_key() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let mut test_db = BitCask::new(tmp_dir)?;
+
+        let k = KeyType::from("".as_bytes());
+        let err = test_db.get(&k).expect_err("Empty key should be rejected.");
+        assert_eq!(err, BitCaskError::KeyEmptyError);
+        Ok(())
+    }
+
+    #[test]
     fn reject_put_empty_key() -> Result<()> {
         let tmp_dir = tempdir()?;
         let mut test_db = BitCask::new(tmp_dir)?;
@@ -199,6 +210,19 @@ mod tests {
         let v = ValueType::from("bar".as_bytes());
         let err = test_db
             .put(k.clone(), v.clone())
+            .expect_err("Empty key should be rejected.");
+        assert_eq!(err, BitCaskError::KeyEmptyError);
+        Ok(())
+    }
+
+    #[test]
+    fn reject_delete_empty_key() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let mut test_db = BitCask::new(tmp_dir)?;
+
+        let k = KeyType::from("".as_bytes());
+        let err = test_db
+            .delete(&k)
             .expect_err("Empty key should be rejected.");
         assert_eq!(err, BitCaskError::KeyEmptyError);
         Ok(())
