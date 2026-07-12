@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 
 const BITCASK_DATA_FILE_NAME: &'static str = "bitcask.data";
@@ -76,12 +76,11 @@ struct BitCask {
 impl BitCask {
     pub fn new<P: AsRef<Path>>(data_dir: P) -> Result<Self> {
         std::fs::create_dir_all(data_dir.as_ref())?;
-        let data_file = DataFile::new(data_dir.as_ref())?;
-        let key_dir = KeyDir::new();
-
-        // TODO: build the KeyDir when the BitCask start.
-
-        Ok(Self { data_file, key_dir })
+        let mut data_file = DataFile::new(data_dir.as_ref())?;
+        let mut r = BufReader::new(&mut data_file.file);
+        let key_dir = Self::build_keydir(&mut r)?;
+        let bitcask = Self { data_file, key_dir };
+        Ok(bitcask)
     }
     pub fn get(&mut self, key: &KeyType) -> Result<ValueType> {
         if key.is_empty() {
@@ -123,6 +122,42 @@ impl BitCask {
         self.key_dir.remove(key);
         Ok(())
     }
+    pub fn build_keydir<T: Seek + Read>(r: &mut BufReader<T>) -> Result<KeyDir> {
+        let mut len_buf: [u8; 4] = [0; 4];
+        let mut keydir = KeyDir::new();
+        let file_len = r.seek(SeekFrom::End(0)).unwrap();
+        let mut offset = r.seek(SeekFrom::Start(0))?;
+
+        while offset < file_len {
+            r.read_exact(&mut len_buf)?;
+            let key_len = u32::from_le_bytes(len_buf);
+            r.read_exact(&mut len_buf)?;
+            let vpos = match u32::from_le_bytes(len_buf) {
+                0 => None,
+                pos => Some(ValueLocation {
+                    value_size: pos as usize,
+                    value_pos: offset + 2 * size_of::<u32>() as u64 + key_len as u64,
+                }),
+            };
+            let mut key = vec![0; key_len as usize];
+            r.read_exact(&mut key)?;
+            match vpos {
+                None => {
+                    keydir.remove(&key).unwrap();
+                }
+                Some(vpos) => {
+                    r.seek_relative(vpos.value_size as i64)?;
+                    offset += vpos.value_size as u64;
+                    keydir.insert(key, vpos);
+                }
+            }
+            offset += 2 * size_of::<u32>() as u64 + key_len as u64;
+        }
+        // No incomplete entry
+        assert_eq!(offset, file_len);
+
+        Ok(keydir)
+    }
 }
 
 fn main() {
@@ -149,6 +184,25 @@ fn main() {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn open_from_existing_file() -> Result<()> {
+        let tmp_dir = tempdir()?;
+
+        let k = KeyType::from("foo".as_bytes());
+        let v = ValueType::from("bar".as_bytes());
+        {
+            // Preapare a datafile
+            let mut tmp_db = BitCask::new(tmp_dir.path())?;
+            tmp_db.put(k.clone(), v.clone())?;
+            // Drop DB here
+        }
+
+        let mut test_db = BitCask::new(tmp_dir.path())?;
+        let result = test_db.get(&k).unwrap();
+        assert_eq!(v, result);
+        Ok(())
+    }
 
     #[test]
     fn simple_put_get() -> Result<()> {
